@@ -17,9 +17,19 @@ message(STATUS "Found protoc executable: ${PROTOBUF_PROTOC_EXECUTABLE}")
 
 # ----- Protobuf transpile -----
 
-protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment.proto)
+#- protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment.proto)
+#+ -b "feature/resend_loop_keyframes"
+set (PATCH_RESEND_LOOP_KEYFRAMES OFF CACHE BOOL "Enable patch resending loop keyframes by protobuf")
+if(NOT PATCH_RESEND_LOOP_KEYFRAMES)
+    protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment.proto)
+    message(STATUS "patch resending loop keyframes by protobuf: DISABLED")
+else()
+    protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment2.proto)
+    message(STATUS "patch resending loop keyframes by protobuf: ENABLED")
+endif()
 
 # ----- Set build type -----
+
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release")
@@ -40,6 +50,11 @@ add_library(socket_publisher
 if(NOT MSVC)
     set_source_files_properties(${MAP_PB_HEADER} ${MAP_PB_SOURCE}
                                 COMPILE_FLAGS -Wno-unused-variable)
+endif()
+
+#+ -b "feature/resend_loop_keyframes"
+if(PATCH_RESEND_LOOP_KEYFRAMES)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC PATCH_RESEND_LOOP_KEYFRAMES)
 endif()
 
 set_target_properties(socket_publisher PROPERTIES

@@ -1,6 +1,10 @@
 #include "socket_publisher/data_serializer.h"
 
+#if !defined(PATCH_RESEND_LOOP_KEYFRAMES)
 #include "stella_vslam/data/keyframe.h"
+#else
+#include "socket_publisher/keyframe.h"
+#endif
 #include "stella_vslam/data/landmark.h"
 #include "stella_vslam/publish/frame_publisher.h"
 #include "stella_vslam/publish/map_publisher.h"
@@ -10,7 +14,11 @@
 #include <opencv2/imgcodecs.hpp>
 
 // map_segment.pb.h will be generated into build/src/socket_publisher/ when make
+#if !defined(PATCH_RESEND_LOOP_KEYFRAMES)
 #include "map_segment.pb.h"
+#else
+#include "map_segment2.pb.h"
+#endif
 
 namespace socket_publisher {
 
@@ -98,6 +106,9 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
         const auto id = keyfrm->id_;
         const auto pose = keyfrm->get_pose_cw();
         const auto pose_hash = get_mat_hash(pose); // get zipped code (likely hash)
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+        bool loop_keyfrm = false;
+#endif
 
         next_keyframe_hash_map[id] = pose_hash;
 
@@ -105,8 +116,15 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
         // and remove it from "keyframe_zip".
         if (keyframe_hash_map_->count(id) != 0) {
             if (keyframe_hash_map_->at(id) == pose_hash) {
-                keyframe_hash_map_->erase(id);
-                continue;
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+                if (!keyfrm->cannot_be_erased()) {
+#endif
+                    keyframe_hash_map_->erase(id);
+                    continue;
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+                }
+                loop_keyfrm = true; // one of loop edge keyframes
+#endif
             }
             keyframe_hash_map_->erase(id);
         }
@@ -120,6 +138,9 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
             pose_obj->add_pose(pose(ir, il));
         }
         keyfrm_obj->set_allocated_pose(pose_obj);
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+        keyfrm_obj->set_loop(loop_keyfrm);
+#endif
         allocated_keyframes.push_front(keyfrm_obj);
     }
     // add removed keyframes.
@@ -128,6 +149,9 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
 
         auto keyfrm_obj = map.add_keyframes();
         keyfrm_obj->set_id(id);
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+        keyfrm_obj->set_loop(false);
+#endif
     }
 
     *keyframe_hash_map_ = next_keyframe_hash_map;
