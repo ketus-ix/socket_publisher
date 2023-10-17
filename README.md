@@ -17,7 +17,7 @@ The source code can be viewed from this [GitHub repository](https://github.com/k
 Cloning the repository:
 
 ```bash
-git clone -b 0.0.1/resend_loop_keyframes --recursive https://github.com/ketus-ix/socket_publisher.git
+git clone -b 0.0.1-resend_loop_keyframes --recursive https://github.com/ketus-ix/socket_publisher.git
 ```
 
 ### Dependencies
@@ -39,7 +39,7 @@ After doing the [stella_vslam build procedure](https://github.com/stella-cv/docs
 ```bash
 # When building with support for SocketViewer
 cd ~/lib
-git clone -b 0.0.1/resend_loop_keyframes --recursive https://github.com/ketus-ix/socket_publisher.git
+git clone -b 0.0.1-resend_loop_keyframes --recursive https://github.com/ketus-ix/socket_publisher.git
 mkdir -p socket_publisher/build
 cd socket_publisher/build
 cmake -DPATCH_RESEND_LOOP_KEYFRAMES=ON -DCMAKE_BUILD_TYPE=RelWithDebInfo ..
