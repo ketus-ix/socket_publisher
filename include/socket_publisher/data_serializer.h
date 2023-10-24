@@ -50,6 +50,15 @@ private:
     double current_pose_hash_ = 0;
     int frame_hash_ = 0;
 
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+    stella_vslam::Mat44_t get_keyframe_pose_map(const std::shared_ptr<stella_vslam::data::keyframe> keyfrm,
+                                                std::unordered_map<unsigned int, stella_vslam::Mat44_t>& keyframe_pose_map);
+
+    std::unique_ptr<std::unordered_map<unsigned int, stella_vslam::Mat44_t>> keyframe_pose_map_;
+    unsigned int close_keyfrm_ids_[2] = { 0, 0 };
+    stella_vslam::Mat44_t close_keyfrm_poses_[2];
+#endif
+
     inline double get_vec_hash(const stella_vslam::Vec3_t& point) {
         return point[0] + point[1] + point[2];
     }

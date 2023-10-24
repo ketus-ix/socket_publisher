@@ -17,19 +17,19 @@ message(STATUS "Found protoc executable: ${PROTOBUF_PROTOC_EXECUTABLE}")
 
 # ----- Protobuf transpile -----
 
-#- protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment.proto)
+protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment.proto)
+
+# ----- Compile configuration -----
+
 #+ -b "feature/resend_loop_keyframes"
 set (PATCH_RESEND_LOOP_KEYFRAMES OFF CACHE BOOL "Enable patch resending loop keyframes by protobuf")
 if(NOT PATCH_RESEND_LOOP_KEYFRAMES)
-    protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment.proto)
     message(STATUS "patch resending loop keyframes by protobuf: DISABLED")
 else()
-    protobuf_generate_cpp(MAP_PB_SOURCE MAP_PB_HEADER protobuf/map_segment2.proto)
     message(STATUS "patch resending loop keyframes by protobuf: ENABLED")
 endif()
 
 # ----- Set build type -----
-
 
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE "Release")

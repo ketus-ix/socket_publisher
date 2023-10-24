@@ -1,10 +1,6 @@
 #include "socket_publisher/data_serializer.h"
 
-#if !defined(PATCH_RESEND_LOOP_KEYFRAMES)
 #include "stella_vslam/data/keyframe.h"
-#else
-#include "socket_publisher/keyframe.h"
-#endif
 #include "stella_vslam/data/landmark.h"
 #include "stella_vslam/publish/frame_publisher.h"
 #include "stella_vslam/publish/map_publisher.h"
@@ -14,11 +10,7 @@
 #include <opencv2/imgcodecs.hpp>
 
 // map_segment.pb.h will be generated into build/src/socket_publisher/ when make
-#if !defined(PATCH_RESEND_LOOP_KEYFRAMES)
 #include "map_segment.pb.h"
-#else
-#include "map_segment2.pb.h"
-#endif
 
 namespace socket_publisher {
 
@@ -84,6 +76,23 @@ std::string data_serializer::serialize_latest_frame(const unsigned int image_qua
     return base64_serial;
 }
 
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+stella_vslam::Mat44_t data_serializer::get_keyframe_pose_map(const std::shared_ptr<stella_vslam::data::keyframe> keyfrm,
+                                                             std::unordered_map<unsigned int, stella_vslam::Mat44_t>& keyframe_pose_map) {
+    stella_vslam::Mat44_t pose;
+
+    const auto id = keyfrm->id_;
+    if (keyframe_pose_map.count(id) != 0) {
+        pose = keyframe_pose_map.at(id);
+    } else {
+        pose = keyfrm->get_pose_cw();
+        keyframe_pose_map[id] = pose;
+    }
+
+    return pose;
+}
+#endif
+
 std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared_ptr<stella_vslam::data::keyframe>>& keyfrms,
                                                    const std::vector<std::shared_ptr<stella_vslam::data::landmark>>& all_landmarks,
                                                    const std::set<std::shared_ptr<stella_vslam::data::landmark>>& local_landmarks,
@@ -95,7 +104,16 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
 
     std::forward_list<map_segment::map_keyframe*> allocated_keyframes;
 
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+    std::unordered_map<unsigned int, stella_vslam::Mat44_t> obtained_keyfrms_pose_map;
+    std::unordered_map<unsigned int, unsigned int> detected_loop_keyfrms_map;
+#endif
+
     // 1. keyframe registration
+
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+    bool update_keyfrms = false;
+#endif
 
     std::unordered_map<unsigned int, double> next_keyframe_hash_map;
     for (const auto& keyfrm : keyfrms) {
@@ -104,11 +122,12 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
         }
 
         const auto id = keyfrm->id_;
+#if !defined(PATCH_RESEND_LOOP_KEYFRAMES)
         const auto pose = keyfrm->get_pose_cw();
-        const auto pose_hash = get_mat_hash(pose); // get zipped code (likely hash)
-#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
-        bool loop_keyfrm = false;
+#else
+        const auto pose = get_keyframe_pose_map(keyfrm, obtained_keyfrms_pose_map);
 #endif
+        const auto pose_hash = get_mat_hash(pose); // get zipped code (likely hash)
 
         next_keyframe_hash_map[id] = pose_hash;
 
@@ -116,18 +135,15 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
         // and remove it from "keyframe_zip".
         if (keyframe_hash_map_->count(id) != 0) {
             if (keyframe_hash_map_->at(id) == pose_hash) {
-#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
-                if (!keyfrm->cannot_be_erased()) {
-#endif
-                    keyframe_hash_map_->erase(id);
-                    continue;
-#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
-                }
-                loop_keyfrm = true; // one of loop edge keyframes
-#endif
+                keyframe_hash_map_->erase(id);
+                continue;
             }
             keyframe_hash_map_->erase(id);
         }
+
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+        update_keyfrms = true;
+#endif
 
         auto keyfrm_obj = map.add_keyframes();
         keyfrm_obj->set_id(keyfrm->id_);
@@ -138,9 +154,6 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
             pose_obj->add_pose(pose(ir, il));
         }
         keyfrm_obj->set_allocated_pose(pose_obj);
-#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
-        keyfrm_obj->set_loop(loop_keyfrm);
-#endif
         allocated_keyframes.push_front(keyfrm_obj);
     }
     // add removed keyframes.
@@ -149,12 +162,13 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
 
         auto keyfrm_obj = map.add_keyframes();
         keyfrm_obj->set_id(id);
-#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
-        keyfrm_obj->set_loop(false);
-#endif
     }
 
     *keyframe_hash_map_ = next_keyframe_hash_map;
+
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+    std::vector<std::shared_ptr<stella_vslam::data::keyframe>> covisibilities;
+#endif
 
     // 2. graph registration
     for (const auto& keyfrm : keyfrms) {
@@ -177,6 +191,39 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
                 const auto edge_obj = map.add_edges();
                 edge_obj->set_id0(keyfrm_id);
                 edge_obj->set_id1(covisibility->id_);
+
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+                // find a pair of nearest loop keyframes to current camera frame from among 
+                // all keyframes composing covisibility graph
+                if (update_keyfrms) {
+                    continue;
+                }
+                if (keyfrm_id == close_keyfrm_ids_[0] && covisibility->id_ == close_keyfrm_ids_[1]) {
+                    continue;
+                }
+                if (std::labs((long int)keyfrm_id - (long int)covisibility->id_) == 1)  {
+                    if (close_keyfrm_ids_[0] == 0 && close_keyfrm_ids_[1] == 0) {
+                        close_keyfrm_ids_[0] = keyfrm_id;
+                        close_keyfrm_ids_[1] = covisibility->id_;
+                        close_keyfrm_poses_[0] = get_keyframe_pose_map(keyfrm, obtained_keyfrms_pose_map);
+                        close_keyfrm_poses_[1] = get_keyframe_pose_map(covisibility, obtained_keyfrms_pose_map);
+                    } else {
+                        const auto t_cf_kf0_old = (current_camera_pose - close_keyfrm_poses_[0]).block(0, 3, 3, 1);        
+                        const auto t_cf_kf1_old = (current_camera_pose - close_keyfrm_poses_[1]).block(0, 3, 3, 1);
+                        const auto pose0_new = get_keyframe_pose_map(keyfrm, obtained_keyfrms_pose_map);
+                        const auto pose1_new = get_keyframe_pose_map(covisibility, obtained_keyfrms_pose_map);
+                        const auto t_cf_kf0_new = (current_camera_pose - pose0_new).block(0, 3, 3, 1);
+                        const auto t_cf_kf1_new = (current_camera_pose - pose1_new).block(0, 3, 3, 1);
+                        if (((t_cf_kf0_old.cwiseAbs() - t_cf_kf0_new.cwiseAbs()).array() > 0).all() &&
+                            ((t_cf_kf1_old.cwiseAbs() - t_cf_kf1_new.cwiseAbs()).array() > 0).all()) {
+                            close_keyfrm_ids_[0] = keyfrm_id;
+                            close_keyfrm_ids_[1] = covisibility->id_;
+                            close_keyfrm_poses_[0] = pose0_new;
+                            close_keyfrm_poses_[1] = pose0_new;
+                        }
+                    }
+                }
+#endif
             }
         }
 
@@ -200,8 +247,83 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
             const auto edge_obj = map.add_edges();
             edge_obj->set_id0(keyfrm_id);
             edge_obj->set_id1(loop_edge->id_);
+
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+            if (detected_loop_keyfrms_map.count(keyfrm_id) != 0) {
+                if (detected_loop_keyfrms_map.at(keyfrm_id) != loop_edge->id_) {
+                    detected_loop_keyfrms_map.erase(keyfrm_id);
+                    detected_loop_keyfrms_map[loop_edge->id_] = keyfrm_id;
+                }
+            } else {
+                detected_loop_keyfrms_map[keyfrm_id] = loop_edge->id_;
+            }
+#endif
         }
     }
+
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+    // no keyframes to be registred means that current camera frame is running
+    // over loop keyframs. we infrom a pair of nearest keyframes to it
+    if (!update_keyfrms) {
+        if (!(close_keyfrm_ids_[0] == 0 && close_keyfrm_ids_[1] == 0)) {
+            auto message = map.add_messages();
+            message->set_tag("100");
+            message->set_txt("{\"closePairKeyframes\":"
+                              "[{\"id\":" + std::to_string(close_keyfrm_ids_[0]) + "," +
+                                "\"pose\":[[" + std::to_string(close_keyfrm_poses_[0](0, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](0, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](0, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](0, 3)) + "],"
+                                          "[" + std::to_string(close_keyfrm_poses_[0](1, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](1, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](1, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](1, 3)) + "],"
+                                          "[" + std::to_string(close_keyfrm_poses_[0](2, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](2, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](2, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](2, 3)) + "],"
+                                          "[" + std::to_string(close_keyfrm_poses_[0](3, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](3, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](3, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[0](3, 3)) + "]]},"
+                               "{\"id\":" + std::to_string(close_keyfrm_ids_[1]) + "," +
+                                "\"pose\":[[" + std::to_string(close_keyfrm_poses_[1](0, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](0, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](0, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](0, 3)) + "],"
+                                          "[" + std::to_string(close_keyfrm_poses_[1](1, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](1, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](1, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](1, 3)) + "],"
+                                          "[" + std::to_string(close_keyfrm_poses_[1](2, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](2, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](2, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](2, 3)) + "],"
+                                          "[" + std::to_string(close_keyfrm_poses_[1](3, 0)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](3, 1)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](3, 2)) + "," +
+                                                std::to_string(close_keyfrm_poses_[1](3, 3)) + "]]}]"
+                             "}");
+        }
+
+        if (!detected_loop_keyfrms_map.empty()) {
+            std::string txt = "";
+            for (auto itr = detected_loop_keyfrms_map.begin(); itr != detected_loop_keyfrms_map.end(); ) {
+                const auto id0 = itr->first;
+                const auto id1 = itr->second;
+                txt += "[" + std::to_string(id0) + "," + std::to_string(id1) + "]";
+                itr++;
+                if (itr != detected_loop_keyfrms_map.end()) {
+                    txt += ",";
+                }
+            }
+            auto message = map.add_messages();
+            message->set_tag("101");
+            message->set_txt("{\"loopEdgeKeyframes\":[" + txt + "]}");
+
+        }
+    }
+#endif
 
     // 3. landmark registration
 
