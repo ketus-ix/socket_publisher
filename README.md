@@ -6,7 +6,7 @@ Original socket_publisher does not re-send loop keyframes to socket_viewer that 
 
 We wanted all keyframes including loop ones to read out from the SLAM systems, because they are needed to draw completely camera moving locations on a map.
 
-We provide [socket_extractor](https://github.com/ketus-ix/socket_extractor) to extract all keyframe locations from the map information published by the SLAM systems. This customized version of socket_publisher assumes to be used with it instead of original one.
+We provide [socket_extractor](https://github.com/ketus-ix/socket_extractor) which extracts and outputs all keyframe locations from the map information published by the SLAM systems. This customized version of socket_publisher assumes to be used with it instead of original one.
 
 ## Installation
 
@@ -47,7 +47,7 @@ make -j
 sudo make install
 ```
 
-Adding the cmake option `-DPATCH_RESEND_LOOP_KEYFRAMES=ON` enables re-sending loop keyframes feature in this socket_publisher.　The built one with enabling this option can be used with the socket_extractor.
+Adding the cmake option `-DPATCH_RESEND_LOOP_KEYFRAMES=ON` enables re-sending loop keyframes feature in this socket_publisher. The built one with enabling this option can be used with the socket_extractor.
 
 You can use this socket_publisher with also socket_viewer regardless of whether or not the `PATCH_RESEND_LOOP_KEYFRAMES` option is enabled.
 
