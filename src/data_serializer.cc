@@ -265,48 +265,48 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
     // no keyframes to be registred means that current camera frame is running
     // over loop keyframs. we infrom a pair of nearest keyframes to it
     if (!update_keyfrms) {
-        if (!(close_keyfrm_ids_[0] == 0 && close_keyfrm_ids_[1] == 0)) {
-            auto message = map.add_messages();
-            message->set_tag("100");
-            message->set_txt("{\"closePairKeyframes\":"
-                              "[{\"id\":" + std::to_string(close_keyfrm_ids_[0]) + "," +
-                                "\"pose\":[[" + std::to_string(close_keyfrm_poses_[0](0, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](0, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](0, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](0, 3)) + "],"
-                                          "[" + std::to_string(close_keyfrm_poses_[0](1, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](1, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](1, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](1, 3)) + "],"
-                                          "[" + std::to_string(close_keyfrm_poses_[0](2, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](2, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](2, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](2, 3)) + "],"
-                                          "[" + std::to_string(close_keyfrm_poses_[0](3, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](3, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](3, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[0](3, 3)) + "]]},"
-                               "{\"id\":" + std::to_string(close_keyfrm_ids_[1]) + "," +
-                                "\"pose\":[[" + std::to_string(close_keyfrm_poses_[1](0, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](0, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](0, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](0, 3)) + "],"
-                                          "[" + std::to_string(close_keyfrm_poses_[1](1, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](1, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](1, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](1, 3)) + "],"
-                                          "[" + std::to_string(close_keyfrm_poses_[1](2, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](2, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](2, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](2, 3)) + "],"
-                                          "[" + std::to_string(close_keyfrm_poses_[1](3, 0)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](3, 1)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](3, 2)) + "," +
-                                                std::to_string(close_keyfrm_poses_[1](3, 3)) + "]]}]"
-                             "}");
-        }
-
         if (!detected_loop_keyfrms_map.empty()) {
+            if (!(close_keyfrm_ids_[0] == 0 && close_keyfrm_ids_[1] == 0)) {
+                auto message = map.add_messages();
+                message->set_tag("100");
+                message->set_txt("{\"closePairKeyframes\":"
+                                  "[{\"id\":" + std::to_string(close_keyfrm_ids_[0]) + "," +
+                                    "\"pose\":[[" + std::to_string(close_keyfrm_poses_[0](0, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](0, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](0, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](0, 3)) + "],"
+                                              "[" + std::to_string(close_keyfrm_poses_[0](1, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](1, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](1, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](1, 3)) + "],"
+                                              "[" + std::to_string(close_keyfrm_poses_[0](2, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](2, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](2, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](2, 3)) + "],"
+                                              "[" + std::to_string(close_keyfrm_poses_[0](3, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](3, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](3, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[0](3, 3)) + "]]},"
+                                   "{\"id\":" + std::to_string(close_keyfrm_ids_[1]) + "," +
+                                    "\"pose\":[[" + std::to_string(close_keyfrm_poses_[1](0, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](0, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](0, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](0, 3)) + "],"
+                                              "[" + std::to_string(close_keyfrm_poses_[1](1, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](1, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](1, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](1, 3)) + "],"
+                                              "[" + std::to_string(close_keyfrm_poses_[1](2, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](2, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](2, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](2, 3)) + "],"
+                                              "[" + std::to_string(close_keyfrm_poses_[1](3, 0)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](3, 1)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](3, 2)) + "," +
+                                                    std::to_string(close_keyfrm_poses_[1](3, 3)) + "]]}]"
+                                 "}");
+            }
+
             std::string txt = "";
             for (auto itr = detected_loop_keyfrms_map.begin(); itr != detected_loop_keyfrms_map.end(); ) {
                 const auto id0 = itr->first;
@@ -320,7 +320,6 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
             auto message = map.add_messages();
             message->set_tag("101");
             message->set_txt("{\"loopEdgeKeyframes\":[" + txt + "]}");
-
         }
     }
 #endif
