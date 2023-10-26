@@ -178,6 +178,10 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
 
         const unsigned int keyfrm_id = keyfrm->id_;
 
+#if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+        const auto loop_edges = keyfrm->graph_node_->get_loop_edges();
+#endif
+
         // covisibility graph
         const auto covisibilities = keyfrm->graph_node_->get_covisibilities_over_min_num_shared_lms(100);
         if (!covisibilities.empty()) {
@@ -193,6 +197,10 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
                 edge_obj->set_id1(covisibility->id_);
 
 #if defined(PATCH_RESEND_LOOP_KEYFRAMES)
+                if (loop_edges.empty()) {
+                    continue;
+                }
+
                 // find a pair of nearest loop keyframes to current camera frame from among 
                 // all keyframes composing covisibility graph
                 if (update_keyfrms) {
@@ -236,7 +244,9 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
         }
 
         // loop edges
+#if !defined(PATCH_RESEND_LOOP_KEYFRAMES)
         const auto loop_edges = keyfrm->graph_node_->get_loop_edges();
+#endif
         for (const auto& loop_edge : loop_edges) {
             if (!loop_edge) {
                 continue;
@@ -270,40 +280,8 @@ std::string data_serializer::serialize_as_protobuf(const std::vector<std::shared
                 auto message = map.add_messages();
                 message->set_tag("100");
                 message->set_txt("{\"closePairKeyframes\":"
-                                  "[{\"id\":" + std::to_string(close_keyfrm_ids_[0]) + "," +
-                                    "\"pose\":[[" + std::to_string(close_keyfrm_poses_[0](0, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](0, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](0, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](0, 3)) + "],"
-                                              "[" + std::to_string(close_keyfrm_poses_[0](1, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](1, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](1, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](1, 3)) + "],"
-                                              "[" + std::to_string(close_keyfrm_poses_[0](2, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](2, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](2, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](2, 3)) + "],"
-                                              "[" + std::to_string(close_keyfrm_poses_[0](3, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](3, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](3, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[0](3, 3)) + "]]},"
-                                   "{\"id\":" + std::to_string(close_keyfrm_ids_[1]) + "," +
-                                    "\"pose\":[[" + std::to_string(close_keyfrm_poses_[1](0, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](0, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](0, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](0, 3)) + "],"
-                                              "[" + std::to_string(close_keyfrm_poses_[1](1, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](1, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](1, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](1, 3)) + "],"
-                                              "[" + std::to_string(close_keyfrm_poses_[1](2, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](2, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](2, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](2, 3)) + "],"
-                                              "[" + std::to_string(close_keyfrm_poses_[1](3, 0)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](3, 1)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](3, 2)) + "," +
-                                                    std::to_string(close_keyfrm_poses_[1](3, 3)) + "]]}]"
+                                    "[" + std::to_string(close_keyfrm_ids_[0]) + ","
+                                        + std::to_string(close_keyfrm_ids_[1]) + "]"
                                  "}");
             }
 
